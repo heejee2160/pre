@@ -36,7 +36,7 @@ def H(html: str):
 H(f"""<style>
 header[data-testid="stHeader"], [data-testid="stToolbar"], [data-testid="stDecoration"] {{display:none !important}}
 html, body, [data-testid="stAppViewContainer"], .stApp {{background:{BG};}}
-.block-container, [data-testid="stMainBlockContainer"] {{padding:0 12px 24px !important; max-width:100% !important}}
+.block-container, [data-testid="stMainBlockContainer"] {{padding:8px 12px 24px !important; max-width:100% !important}}
 [data-testid="stVerticalBlock"] {{gap:.55rem}}
 [data-testid="stHorizontalBlock"] {{gap:.6rem}}
 p, li, label, .stMarkdown {{font-size:13px}}
@@ -146,10 +146,11 @@ ind = qp.get("ind") if qp.get("ind") in [x for x, _ in INDS] else "전체"
 names = cur.set_index("행정동코드")
 codes = list(names.sort_values(["구군", "읍면동"]).index)
 dong = qp.get("dong") if qp.get("dong") in names.index else L.top_n(staged, month, 1)["행정동코드"].iloc[0]
+pick = [x for x in str(qp.get("pick", "")).split(",") if x in [n for n, _ in INDS[1:]]]
 
 
 def link(**kw):
-    s = dict(page=page, dong=dong, month=month, gu=gu, ind=ind)
+    s = dict(page=page, dong=dong, month=month, gu=gu, ind=ind, pick=",".join(pick))
     s.update(kw)
     return "?" + urlencode(s)
 
@@ -185,6 +186,16 @@ def rail(active):
 
 # ======================= ① 전체 지도 =======================
 def page_map():
+    ind_note = None
+    view, tag = staged, PRED
+    if ind != "전체":
+        if month == MONTHS[-1]:
+            alt = L.stage_for_industry(staged, D["pred_dong_industry"], month, ind)
+            if alt is not None:
+                alt["전월대비"] = float("nan")   # 업종별 예측은 한 달치뿐이라 전월 대비 없음
+                view, tag = pd.concat([staged[staged["기준월"] != month], alt]), f"{PRED} · {ind}"
+        else:
+            ind_note = "업종별 예측은 최신 기준월만 있어 전체 업종으로 보여 줍니다."
     c_rail, c_left, c_map = st.columns([0.42, 2.45, 7.9])
     with c_rail:
         rail("지도")
@@ -208,7 +219,7 @@ def page_map():
         with st.expander("상세조건 · 최소 점포 수 · 예측 폐업률"):
             min_shop = st.slider("영업 점포 최소 수", 0, 300, 0, 10)
             rng = st.slider("예측 폐업률 범위(%)", 0.0, 15.0, (0.0, 15.0), 0.5)
-        t = L.top_n(staged, month, 5, gu)
+        t = L.top_n(view, month, 5, gu)
         rows = "".join(
             f'<a href="{link(page="detail", dong=x["행정동코드"])}" target="_self"><span class="k">{i + 1}</span>'
             f'<span>{x["구군"]} {x["읍면동"]}</span><span class="p">{x["폐업위험률"]:.1f}%</span>'
@@ -221,14 +232,8 @@ def page_map():
             st.session_state["pop_n"] = st.session_state.get("pop_n", 0) + 1
 
     with c_map:
-        view, tag = staged, PRED
-        if ind != "전체":
-            if month == MONTHS[-1]:
-                alt = L.stage_for_industry(staged, D["pred_dong_industry"], month, ind)
-                if alt is not None:
-                    view, tag = pd.concat([staged[staged["기준월"] != month], alt]), f"{PRED} · {ind}"
-            else:
-                st.caption("업종별 예측은 최신 기준월만 있어 전체 업종으로 보여 줍니다.")
+        if ind_note:
+            st.caption(ind_note)
         v = view.copy()
         out = (v["영업점포수"] < min_shop) | (v["폐업위험률"] < rng[0]) | (v["폐업위험률"] > rng[1])
         v.loc[(v["기준월"] == month) & out, "단계"] = "판단 보류"
@@ -271,10 +276,10 @@ def page_detail():
         cg = st.checkbox(f"{r['구군']} 평균", True)
         extra = st.selectbox("직접 추가", [""] + [c for c in codes if c != dong],
                              format_func=lambda c: "행정동 추가…" if c == "" else label(c))
-        picked = st.multiselect("업종", [x for x, _ in INDS[1:]], default=pi["카드업종"].head(2).tolist())
-        st.session_state["picked"] = (dong, picked)
+        picked = st.multiselect("업종", [x for x, _ in INDS[1:]], default=pick or pi["카드업종"].head(2).tolist())
+        pick[:] = picked
         if st.button("선택 업종 담고 근거 보기 →", type="primary", use_container_width=True):
-            goto(page="data")
+            goto(page="data", pick=",".join(picked))
 
     with c_main:
         # ---- 제목 ----
@@ -285,7 +290,7 @@ def page_detail():
 <span style="color:{MUT};font-size:14px">{r['구군']}</span>{chip(r['단계'])}
 <span class="note" style="font-size:12.5px">{n_all}개 동 중 {rank}위{trend}</span>
 <a href="{link(page='data')}" target="_self" style="margin-left:auto;color:{BLUE};font-size:12px;font-weight:700">리포트 PDF · 원자료 CSV</a></div>
-<p style="font-size:13px;color:#3b4250;margin:4px 0 2px">{L.summary_sentence(r, s_now.iloc[0] if len(s_now) else None)}</p>""")
+<p style="font-size:13px;color:#3b4250;margin:4px 0 10px">{L.summary_sentence(r, s_now.iloc[0] if len(s_now) else None)}</p>""")
 
         # ---- 1행 ----
         left, right = st.columns([3.55, 1.6])
@@ -332,7 +337,7 @@ def page_detail():
                              f'{" <span style=color:" + BLUE + ";font-size:11px;font-weight:700>선택 업종</span>" if sel_ else ""}</span>'
                              f'<span><b style="color:{BLUE if x["사고율"] > x["부산_사고율"] else INK}">{x["사고율"]:.2f}%</b>'
                              f' <span class="note">{x["보증잔액"] / 100:,.0f}억</span></span></div>')
-                H(f"""<div class="card" style="padding:0;overflow:hidden;height:360px">
+                H(f"""<div class="card" style="padding:0;overflow:hidden;height:376px">
 <div class="lblue" style="padding:12px 14px">
 <div style="font-size:14px;font-weight:700">재단 보증현황 <span class="note" style="font-weight:400">{r['구군']}</span> {bd('실측')}</div>
 <div class="note" style="margin-top:4px">보증 사고율</div>
@@ -377,7 +382,7 @@ def page_detail():
 <div style="flex:0 0 118px">{L.donut_svg(vals, cols, 118)}</div></div>
 <div style="font-size:11.5px;color:#c9d6e6;margin-top:10px">위험을 낮춘 요인 · {low.iloc[0]["설명"] if len(low) else "-"}</div></div>""")
         with c3, st.container(border=True, height=300):
-            H('<div style="font-size:15px;font-weight:700;margin-bottom:-6px">언제부터 나빠졌나</div>')
+            H('<div style="font-size:15px;font-weight:700;margin-bottom:4px">언제부터 나빠졌나</div>')
             s1, s2 = L.index_series(sig, [dong], "카드소비"), L.index_series(sig, gu_codes, "카드소비")
             q = stx["quarterly"] if stx else pd.Series(dtype=float)
             a_, b_ = st.columns([1.15, 1])
@@ -476,8 +481,7 @@ def page_data():
         H(f'<div style="font-size:24px;font-weight:700;margin:2px 0 4px">근거 확인 및 자료 다운</div>')
         t1, t2 = st.tabs(["선택한 동 근거 확인", "원자료 · CSV 내려받기"])
         with t1:
-            pk = st.session_state.get("picked")
-            picked = pk[1] if pk and pk[0] == dong else []
+            picked = pick
             a, b = st.columns([2.2, 1])
             nd = a.selectbox("행정동", codes, index=codes.index(dong), format_func=label)
             if nd != dong:
@@ -502,9 +506,12 @@ def page_data():
                 memo = st.text_area("담당자 메모", key=f"memo_{dong}", height=90)
             with rr, st.container(border=True):
                 st.markdown("**자료 신뢰도와 유의사항**")
-                H(f"""<div style="font-size:12.5px;line-height:1.9">· 폐업위험률·요인·업종 위험·점포 집계 {bd(PRED)} 모델·인허가 연결 전<br>
-· 카드 소비·생활인구 {bd('실측')} 2023.01~2026.07<br>· 재단 보증 {bd('실측')} 구·군 단위 (행정동 자료 없음)<br>
-· 요인은 SHAP 기여도이며 인과관계가 아닙니다.<br>· 보증 승인·제한 판단에 쓰지 않습니다.</div>""")
+                H(f"""<div style="font-size:12.5px;margin-bottom:12px">
+<div style="padding:3px 0">· 폐업위험률·요인·업종 위험·점포 집계 {bd(PRED)} 모델·인허가 연결 전</div>
+<div style="padding:3px 0">· 카드 소비·생활인구 {bd('실측')} 2023.01~2026.07</div>
+<div style="padding:3px 0">· 재단 보증 {bd('실측')} 구·군 단위 (행정동 자료 없음)</div>
+<div style="padding:3px 0">· 요인은 SHAP 기여도이며 인과관계가 아닙니다.</div>
+<div style="padding:3px 0">· 보증 승인·제한 판단에 쓰지 않습니다.</div></div>""")
                 shx = D["shap_top"]
                 shx = shx[shx["행정동코드"] == dong].sort_values("순위")
                 report = "\n".join([f"# {r['구군']} {r['읍면동']} 근거 확인 리포트", f"- 기준월: {L.month_label(month)}",
@@ -556,4 +563,4 @@ def page_data():
 
 
 {"map": page_map, "detail": page_detail, "data": page_data}[page]()
-st.query_params.update({"page": page, "dong": dong, "month": str(month), "gu": gu, "ind": ind})
+st.query_params.update({"page": page, "dong": dong, "month": str(month), "gu": gu, "ind": ind, "pick": ",".join(pick)})
