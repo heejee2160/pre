@@ -38,6 +38,9 @@ header[data-testid="stHeader"], [data-testid="stToolbar"], [data-testid="stDecor
 html, body, [data-testid="stAppViewContainer"], .stApp {{background:{BG};}}
 .block-container, [data-testid="stMainBlockContainer"] {{padding:8px 12px 24px !important; max-width:100% !important}}
 [data-testid="stVerticalBlock"] {{gap:.55rem}}
+[data-testid="stMarkdownContainer"], .stMarkdown, [data-testid="stMarkdown"] {{margin-bottom:0 !important}}
+[data-testid="stMarkdownContainer"] > div {{margin-bottom:0}}
+[data-testid="stElementContainer"], .element-container {{margin-bottom:0 !important}}
 [data-testid="stHorizontalBlock"] {{gap:.6rem}}
 p, li, label, .stMarkdown {{font-size:13px}}
 [data-testid="stWidgetLabel"] p {{font-size:12px !important; color:{MUT}}}
@@ -299,7 +302,7 @@ def page_detail():
             risk, d = r["폐업위험률"], r["전월대비"]
             mx = max(12.0, (0 if pd.isna(risk) else risk) * 1.3)
             with k1:
-                H(f"""<div class="card navy" style="height:212px">
+                H(f"""<div class="card navy" style="min-height:212px">
 <div style="display:flex;justify-content:space-between;align-items:center">
 <span style="font-size:14px;font-weight:700">폐업위험률 <span style="font-weight:400;color:#9fb2cb;font-size:12px">모델 예측 · 향후 6개월</span> {bd(PRED)}</span>
 <span style="border:1px solid #6f87a8;padding:2px 8px;font-size:11.5px">↗ 전월 {'-' if pd.isna(d) else f'{d:+.1f}%p'}</span></div>
@@ -311,9 +314,9 @@ def page_detail():
 <b>부산 평균 {r['부산평균']}% · {r['구군']} {r['구평균']}%</b><span>0 — {mx:.0f}%</span></div></div>""")
             with k2:
                 top_pct = "" if rank == "-" else f"상위 {rank / n_all * 100:.0f}%"
-                H(f"""<div class="card" style="height:101px;margin-bottom:10px"><div class="kv">예상 폐업 점포 {bd(PRED)}<b>{int(r['예상폐업점포'])}곳</b></div>
+                H(f"""<div class="card" style="min-height:101px;margin-bottom:10px"><div class="kv">예상 폐업 점포 {bd(PRED)}<b>{int(r['예상폐업점포'])}곳</b></div>
 <div class="note" style="text-align:right;margin-top:-18px">영업 {int(r['영업점포수'])}곳 중</div></div>
-<div class="card" style="height:101px"><div class="kv">위험 순위<b>{rank}위</b></div>
+<div class="card" style="min-height:101px"><div class="kv">위험 순위<b>{rank}위</b></div>
 <div class="note" style="text-align:right;margin-top:-18px">{n_all}개 동 중 {top_pct}</div></div>""")
             sigs = [("최근 6개월 폐업률", "-" if not stx else f"{stx['close6']}%",
                      f"전년 동기 {stx['close6_prev']}%" if stx and stx["close6_prev"] is not None else "", STORE),
@@ -337,7 +340,7 @@ def page_detail():
                              f'{" <span style=color:" + BLUE + ";font-size:11px;font-weight:700>선택 업종</span>" if sel_ else ""}</span>'
                              f'<span><b style="color:{BLUE if x["사고율"] > x["부산_사고율"] else INK}">{x["사고율"]:.2f}%</b>'
                              f' <span class="note">{x["보증잔액"] / 100:,.0f}억</span></span></div>')
-                H(f"""<div class="card" style="padding:0;overflow:hidden;height:376px">
+                H(f"""<div class="card" style="padding:0;min-height:376px">
 <div class="lblue" style="padding:12px 14px">
 <div style="font-size:14px;font-weight:700">재단 보증현황 <span class="note" style="font-weight:400">{r['구군']}</span> {bd('실측')}</div>
 <div class="note" style="margin-top:4px">보증 사고율</div>
@@ -363,7 +366,7 @@ def page_detail():
                          f'<span class="fl" style="width:{x["폐업위험률"] / mx * 100:.0f}%;background:{BLUE if dd > 0 else "#b1c6ef"}"></span>'
                          f'<span class="av" style="left:{avg / mx * 100:.0f}%"></span></span><span class="v">{x["폐업위험률"]:.1f}%</span>'
                          f'<span class="d" style="color:{"#d6342c" if dd > 0 else MUT}">{dd:+.1f}</span></div>')
-            H(f'<div class="card" style="height:300px"><h4>업종별 폐업위험 {bd(PRED)}<span class="n">향후 6개월</span></h4>'
+            H(f'<div class="card" style="min-height:320px"><h4>업종별 폐업위험 {bd(PRED)}<span class="n">향후 6개월</span></h4>'
               f'<div class="note" style="margin:-4px 0 4px">점선 = 부산 평균 {avg}%</div>{bars}</div>')
         with c2:
             ups = sh[sh["방향"] == "상승"]
@@ -376,12 +379,12 @@ def page_detail():
                             f'<span style="min-width:0"><span style="display:inline-block;width:10px;height:10px;background:{cols[i % 4]};margin-right:6px"></span>{t_}</span>'
                             f'<b style="font-size:15px">{v_:.0f}%</b></div>' for i, (t_, v_) in enumerate(zip(labs, vals)))
             low = sh[sh["방향"] == "하락"]
-            H(f"""<div class="card navy" style="height:300px;overflow:hidden"><h4>폐업위험을 높이는 원인 {bd(PRED)}
+            H(f"""<div class="card navy" style="min-height:320px"><h4>폐업위험을 높이는 원인 {bd(PRED)}
 <span class="n" style="color:#9fb2cb">SHAP 기여 비중 · 인과 아님</span></h4>
 <div style="display:flex;gap:12px;align-items:center"><div style="flex:1 1 auto;min-width:0;font-size:12px">{items}</div>
 <div style="flex:0 0 118px">{L.donut_svg(vals, cols, 118)}</div></div>
 <div style="font-size:11.5px;color:#c9d6e6;margin-top:10px">위험을 낮춘 요인 · {low.iloc[0]["설명"] if len(low) else "-"}</div></div>""")
-        with c3, st.container(border=True, height=300):
+        with c3, st.container(border=True):
             H('<div style="font-size:15px;font-weight:700;margin-bottom:4px">언제부터 나빠졌나</div>')
             s1, s2 = L.index_series(sig, [dong], "카드소비"), L.index_series(sig, gu_codes, "카드소비")
             q = stx["quarterly"] if stx else pd.Series(dtype=float)
@@ -440,14 +443,14 @@ def page_detail():
               f'<table class="tbl"><tr><th></th>{head}</tr>{body}</table></div>')
             k1, k2 = st.columns([1.05, 1])
             with k1:
-                H(f"""<div class="card" style="height:178px"><h4>예측 신뢰도 {bd(PRED)}</h4>
+                H(f"""<div class="card" style="min-height:178px"><h4>예측 신뢰도 {bd(PRED)}</h4>
 <div style="display:flex;gap:10px">
 <div class="kv" style="flex:1">판단 근거 점포<b style="font-size:21px">{int(r['영업점포수'])}곳</b><span style="font-size:10px">30곳 이상이면 판단</span></div>
 <div class="kv" style="flex:1">상위 3요인 비중<b style="font-size:21px">{sum(vals[:-1]):.0f}%</b><span style="font-size:10px">SHAP 합계</span></div></div>
 <div class="kv" style="margin-top:8px">자료 최신월 <b style="display:inline;font-size:14px">{L.month_label(month)}</b> <span style="font-size:10px">카드·인구 기준</span></div></div>""")
             with k2:
                 if stx:
-                    H(f"""<div class="card lblue" style="height:178px;padding-bottom:0"><h4>점포 순증 {bd(STORE)}<span class="n">최근 4개 분기</span></h4>
+                    H(f"""<div class="card lblue" style="min-height:178px"><h4>점포 순증 {bd(STORE)}<span class="n">최근 4개 분기</span></h4>
 <div style="display:flex;justify-content:space-between;align-items:flex-end">
 <div><div style="font-size:30px;font-weight:700;line-height:1">{stx['net']:+d}곳</div>
 <div class="note">개업 {stx['opened']} · 폐업 {stx['closed']}</div></div>{bars_svg(stx['net_q'].tolist(), 104, 64)}</div></div>""")
